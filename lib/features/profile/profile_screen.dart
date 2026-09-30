@@ -40,8 +40,16 @@ class ProfileScreen extends ConsumerWidget {
         const SectionHeader(title: 'Learning'),
         const AppRow(title: 'Bookmarks', icon: Icons.bookmark_outline),
         const AppRow(title: 'Downloads', icon: Icons.download_outlined),
-        const AppRow(title: 'Quiz history', icon: Icons.history_rounded),
-        const AppRow(title: 'Assignments', icon: Icons.task_alt_rounded),
+        AppRow(
+          title: 'Quiz history',
+          icon: Icons.history_rounded,
+          onTap: () => context.push('/quiz-history'),
+        ),
+        AppRow(
+          title: 'Assignments',
+          icon: Icons.task_alt_rounded,
+          onTap: () => context.push('/assignments'),
+        ),
         const SectionHeader(title: 'Preferences'),
         const AppRow(
           title: 'Notifications',

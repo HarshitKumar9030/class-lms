@@ -9,6 +9,7 @@ import '../../features/announcements/announcement_screens.dart';
 import '../../features/assignments/assignment_screens.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/quizzes/quiz_screens.dart';
 import '../../features/resources/resource_library_screen.dart';
 import '../../features/resources/resource_viewer_screen.dart';
 import '../../features/schedule/schedule_screen.dart';
@@ -88,10 +89,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/quizzes',
-                builder: (_, _) => const _PendingPage(
-                  title: 'Quizzes',
-                  message: 'Your quizzes will appear here.',
-                ),
+                builder: (_, _) => const QuizListScreen(),
               ),
             ],
           ),
@@ -109,6 +107,24 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/learn/:id',
         builder: (_, state) =>
             ResourceViewerScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/quizzes/:id',
+        builder: (_, state) => QuizIntroScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/quiz-attempts/:id',
+        builder: (_, state) =>
+            QuizAttemptScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/quiz-results/:id',
+        builder: (_, state) =>
+            QuizResultScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/quiz-history',
+        builder: (_, _) => const QuizHistoryScreen(),
       ),
       GoRoute(
         path: '/announcements',
