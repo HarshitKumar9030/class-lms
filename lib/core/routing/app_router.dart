@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/auth_repository.dart';
 import '../../features/auth/auth_screens.dart';
 import '../../features/announcements/announcement_screens.dart';
+import '../../features/assignments/assignment_screens.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/resources/resource_library_screen.dart';
@@ -122,10 +123,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/assignments',
-        builder: (_, _) => const _PendingPage(
-          title: 'Assignments',
-          message: 'Your homework will appear here.',
-        ),
+        builder: (_, _) => const AssignmentListScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) =>
+                AssignmentDetailScreen(id: state.pathParameters['id']!),
+          ),
+        ],
       ),
       GoRoute(
         path: '/notifications',
