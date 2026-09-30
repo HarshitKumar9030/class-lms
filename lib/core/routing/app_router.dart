@@ -8,6 +8,8 @@ import '../../features/auth/auth_screens.dart';
 import '../../features/announcements/announcement_screens.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/resources/resource_library_screen.dart';
+import '../../features/resources/resource_viewer_screen.dart';
 import '../services/supabase_provider.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/app_components.dart';
@@ -68,10 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/learn',
-                builder: (_, _) => const _PendingPage(
-                  title: 'Learn',
-                  message: 'Your resources will appear here.',
-                ),
+                builder: (_, _) => const ResourceLibraryScreen(),
               ),
             ],
           ),
@@ -106,6 +105,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/learn/:id',
+        builder: (_, state) =>
+            ResourceViewerScreen(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/announcements',
