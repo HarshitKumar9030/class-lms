@@ -15,3 +15,5 @@ Staff use the same sign-in screen. The database grants admin to verified `harshi
 5. Build and install a new APK. Sign in with Google and check that the app receives the session. Verified staff addresses get their assigned role automatically.
 
 The Android and iOS apps register the same callback scheme. If you change it, update both native manifests and `AuthRepository.signInWithGoogle`.
+
+Email confirmation uses this callback too. Open the confirmation email on the phone with the app installed. Supabase verifies the address and returns to the app. The project's default Site URL is currently `localhost:3000`; replace it in **Authentication → URL Configuration** with a real web address for links opened on a computer. An inaccessible Site URL can show a browser error after verification even when the email was confirmed.

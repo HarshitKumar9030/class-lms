@@ -24,6 +24,7 @@ class UserProfile {
 class AuthRepository {
   const AuthRepository(this.client);
   final SupabaseClient client;
+  static const authCallback = 'com.harshitkumar.classlms://login-callback';
 
   Future<void> signIn(String email, String password) async =>
       client.auth.signInWithPassword(email: email.trim(), password: password);
@@ -32,10 +33,11 @@ class AuthRepository {
         email: email.trim(),
         password: password,
         data: {'full_name': name.trim()},
+        emailRedirectTo: authCallback,
       );
   Future<bool> signInWithGoogle() => client.auth.signInWithOAuth(
     OAuthProvider.google,
-    redirectTo: 'com.harshitkumar.classlms://login-callback',
+    redirectTo: authCallback,
     authScreenLaunchMode: LaunchMode.externalApplication,
   );
   Future<void> resetPassword(String email) async =>
