@@ -37,6 +37,21 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ),
+        profile.maybeWhen(
+          data: (value) => value.role == AppRole.student
+              ? const SizedBox.shrink()
+              : Column(
+                  children: [
+                    const SectionHeader(title: 'Teaching'),
+                    AppRow(
+                      title: 'Teacher workspace',
+                      icon: Icons.school_outlined,
+                      onTap: () => context.push('/teacher'),
+                    ),
+                  ],
+                ),
+          orElse: () => const SizedBox.shrink(),
+        ),
         const SectionHeader(title: 'Learning'),
         const AppRow(title: 'Bookmarks', icon: Icons.bookmark_outline),
         const AppRow(title: 'Downloads', icon: Icons.download_outlined),

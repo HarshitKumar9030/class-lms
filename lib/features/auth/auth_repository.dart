@@ -27,6 +27,17 @@ class AuthRepository {
 
   Future<void> signIn(String email, String password) async =>
       client.auth.signInWithPassword(email: email.trim(), password: password);
+  Future<AuthResponse> signUp(String name, String email, String password) =>
+      client.auth.signUp(
+        email: email.trim(),
+        password: password,
+        data: {'full_name': name.trim()},
+      );
+  Future<bool> signInWithGoogle() => client.auth.signInWithOAuth(
+    OAuthProvider.google,
+    redirectTo: 'com.harshitkumar.classlms://login-callback',
+    authScreenLaunchMode: LaunchMode.externalApplication,
+  );
   Future<void> resetPassword(String email) async =>
       client.auth.resetPasswordForEmail(email.trim());
   Future<void> signOut() async => client.auth.signOut();

@@ -42,6 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final signedIn = client.auth.currentUser != null;
       final authPage =
           state.matchedLocation == '/sign-in' ||
+          state.matchedLocation == '/sign-up' ||
           state.matchedLocation == '/forgot-password';
       if (!signedIn && !authPage) return '/sign-in';
       if (signedIn && authPage) return '/home';
@@ -57,6 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
+      GoRoute(path: '/sign-up', builder: (_, _) => const SignUpScreen()),
       GoRoute(
         path: '/forgot-password',
         builder: (_, _) => const ForgotPasswordScreen(),

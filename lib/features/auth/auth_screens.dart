@@ -51,6 +51,27 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final opened = await ref.read(authRepositoryProvider).signInWithGoogle();
+      if (!opened && mounted) {
+        setState(() => error = 'Couldn’t open Google sign-in. Try again.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error = 'Google sign-in is unavailable. Try again later.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -104,11 +125,187 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               const SizedBox(height: 24),
               PrimaryButton(label: 'Sign in', onPressed: submit, busy: busy),
               const SizedBox(height: 12),
+              SizedBox(
+                height: 52,
+                child: TextButton.icon(
+                  onPressed: busy ? null : signInWithGoogle,
+                  icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                  label: const Text('Continue with Google'),
+                ),
+              ),
               TextButton(
                 onPressed: () => context.push('/forgot-password'),
                 child: const Text('Forgot password?'),
               ),
+              TextButton(
+                onPressed: () => context.push('/sign-up'),
+                child: const Text('New here? Create an account'),
+              ),
             ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class SignUpScreen extends ConsumerStatefulWidget {
+  const SignUpScreen({super.key});
+  @override
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
+  final name = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  final confirmation = TextEditingController();
+  bool busy = false;
+  bool sent = false;
+  String? error;
+
+  @override
+  void dispose() {
+    name.dispose();
+    email.dispose();
+    password.dispose();
+    confirmation.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    if (name.text.trim().isEmpty || !email.text.contains('@')) {
+      setState(() => error = 'Enter your name and a valid email address.');
+      return;
+    }
+    if (password.text.length < 8) {
+      setState(() => error = 'Use a password with at least 8 characters.');
+      return;
+    }
+    if (password.text != confirmation.text) {
+      setState(() => error = 'Passwords do not match.');
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final result = await ref
+          .read(authRepositoryProvider)
+          .signUp(name.text, email.text, password.text);
+      if (!mounted) return;
+      if (result.session != null) {
+        context.go('/home');
+      } else {
+        setState(() => sent = true);
+      }
+    } on AuthException catch (e) {
+      if (mounted) setState(() => error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error =
+              'Couldn’t create your account. Check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Create account')),
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.page),
+            shrinkWrap: true,
+            children: sent
+                ? [
+                    Text(
+                      'Check your inbox',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Open the confirmation link sent to your email, then sign in. Your teacher will assign you to a class batch.',
+                    ),
+                    const SizedBox(height: 24),
+                    PrimaryButton(
+                      label: 'Back to sign in',
+                      onPressed: () => context.go('/sign-in'),
+                    ),
+                  ]
+                : [
+                    Text(
+                      'Join your class',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create your student account to get started.',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 32),
+                    TextField(
+                      controller: name,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
+                      decoration: const InputDecoration(labelText: 'Full name'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: email,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'Email address',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: password,
+                      obscureText: true,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: const InputDecoration(labelText: 'Password'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmation,
+                      obscureText: true,
+                      onSubmitted: (_) => submit(),
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                      ),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    PrimaryButton(
+                      label: 'Create account',
+                      onPressed: submit,
+                      busy: busy,
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => context.go('/sign-in'),
+                      child: const Text('Already have an account? Sign in'),
+                    ),
+                  ],
           ),
         ),
       ),

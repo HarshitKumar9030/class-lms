@@ -15,3 +15,9 @@ flutter run --dart-define-from-file=.env.local.json
 The publishable key is safe for the client. Never put the service role key in the app. The database policies enforce roles and batch access.
 
 See [docs/architecture.md](docs/architecture.md) for feature boundaries and routes.
+
+## Accounts
+
+Students can create an account from **Sign in → New here? Create an account**. Email confirmation must remain enabled, and a teacher must assign each student to a batch. The two verified staff addresses are assigned by the database: `harshitkumar9030@gmail.com` is admin and `sharmashriju14@gmail.com` is teacher. Staff use the same email/password or Google sign-in buttons as students.
+
+Google sign-in needs a Google OAuth Web client and Supabase Auth provider setup. See [docs/auth-setup.md](docs/auth-setup.md).
