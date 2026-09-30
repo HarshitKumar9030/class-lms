@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/auth_repository.dart';
 import '../../features/auth/auth_screens.dart';
+import '../../features/announcements/announcement_screens.dart';
+import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../services/supabase_provider.dart';
 import '../theme/app_tokens.dart';
@@ -59,13 +61,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/home',
-                builder: (_, _) => const _PendingPage(
-                  title: 'Today',
-                  message: 'Your class updates will appear here.',
-                ),
-              ),
+              GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
             ],
           ),
           StatefulShellBranch(
@@ -110,6 +106,31 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/announcements',
+        builder: (_, _) => const AnnouncementListScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) =>
+                AnnouncementDetailScreen(id: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/assignments',
+        builder: (_, _) => const _PendingPage(
+          title: 'Assignments',
+          message: 'Your homework will appear here.',
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, _) => const _PendingPage(
+          title: 'Notifications',
+          message: 'Updates from your class will appear here.',
+        ),
       ),
       GoRoute(
         path: '/teacher',
