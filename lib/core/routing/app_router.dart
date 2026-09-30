@@ -10,6 +10,7 @@ import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/resources/resource_library_screen.dart';
 import '../../features/resources/resource_viewer_screen.dart';
+import '../../features/schedule/schedule_screen.dart';
 import '../services/supabase_provider.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/app_components.dart';
@@ -78,10 +79,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/schedule',
-                builder: (_, _) => const _PendingPage(
-                  title: 'Schedule',
-                  message: 'Your classes will appear here.',
-                ),
+                builder: (_, _) => const ScheduleScreen(),
               ),
             ],
           ),
