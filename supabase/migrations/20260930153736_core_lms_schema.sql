@@ -1,6 +1,9 @@
 -- Core relational model. Run in a Supabase project before starting the app.
 create extension if not exists pgcrypto;
 
+create schema if not exists app_private;
+grant usage on schema app_private to authenticated;
+
 create type public.app_role as enum ('student', 'teacher', 'admin');
 create type public.resource_kind as enum ('pdf', 'document', 'image', 'audio', 'video_link', 'web_link', 'worksheet', 'notes', 'presentation', 'vocabulary', 'grammar', 'literature');
 create type public.schedule_kind as enum ('class', 'special', 'test', 'holiday');
@@ -31,7 +34,7 @@ create table public.batch_members (
 );
 create index batch_members_student_idx on public.batch_members(student_id);
 
-create function public.create_profile() returns trigger language plpgsql security definer set search_path = '' as $$
+create function app_private.create_profile() returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles(id, full_name)
   values (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', ''));
@@ -39,20 +42,20 @@ begin
 end;
 $$;
 create trigger on_auth_user_created after insert on auth.users
-for each row execute function public.create_profile();
+for each row execute function app_private.create_profile();
 
-create function public.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$
+create function app_private.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$
 begin new.updated_at = now(); return new; end;
 $$;
 
-create function public.is_staff() returns boolean language sql stable security definer set search_path = '' as $$
+create function app_private.is_staff() returns boolean language sql stable security definer set search_path = '' as $$
   select exists(select 1 from public.profiles where id = (select auth.uid()) and role in ('teacher', 'admin'));
 $$;
-create function public.is_admin() returns boolean language sql stable security definer set search_path = '' as $$
+create function app_private.is_admin() returns boolean language sql stable security definer set search_path = '' as $$
   select exists(select 1 from public.profiles where id = (select auth.uid()) and role = 'admin');
 $$;
-create function public.can_read_batches(target_ids uuid[]) returns boolean language sql stable security definer set search_path = '' as $$
-  select public.is_staff() or exists (
+create function app_private.can_read_batches(target_ids uuid[]) returns boolean language sql stable security definer set search_path = '' as $$
+  select app_private.is_staff() or exists (
     select 1 from public.batch_members bm
     where bm.student_id = (select auth.uid())
       and (cardinality(target_ids) = 0 or bm.batch_id = any(target_ids))
@@ -259,7 +262,7 @@ create index notifications_recipient_idx on public.notifications(recipient_id, c
 
 do $$ declare table_name text; begin
   foreach table_name in array array['profiles','batches','courses','topics','resources','announcements','schedule_events','quizzes','assignments'] loop
-    execute format('create trigger touch_%I before update on public.%I for each row execute function public.touch_updated_at()', table_name, table_name);
+    execute format('create trigger %I before update on public.%I for each row execute function app_private.touch_updated_at()', 'touch_' || table_name, table_name);
   end loop;
 end $$;
 
@@ -270,51 +273,58 @@ do $$ declare table_name text; begin
   end loop;
 end $$;
 
-create policy profiles_read on public.profiles for select to authenticated using (id = (select auth.uid()) or (select public.is_staff()));
-create policy profiles_admin_write on public.profiles for update to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
-create policy batches_read on public.batches for select to authenticated using ((select public.is_staff()) or exists(select 1 from public.batch_members where batch_id = batches.id and student_id = (select auth.uid())));
-create policy batches_staff_insert on public.batches for insert to authenticated with check ((select public.is_staff()));
-create policy batches_staff_update on public.batches for update to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
-create policy batches_staff_delete on public.batches for delete to authenticated using ((select public.is_admin()));
-create policy members_read on public.batch_members for select to authenticated using (student_id = (select auth.uid()) or (select public.is_staff()));
-create policy members_admin_insert on public.batch_members for insert to authenticated with check ((select public.is_admin()));
-create policy members_admin_delete on public.batch_members for delete to authenticated using ((select public.is_admin()));
+create policy profiles_read on public.profiles for select to authenticated using (id = (select auth.uid()) or (select app_private.is_staff()));
+create policy profiles_admin_write on public.profiles for update to authenticated using ((select app_private.is_admin())) with check ((select app_private.is_admin()));
+create policy batches_read on public.batches for select to authenticated using ((select app_private.is_staff()) or exists(select 1 from public.batch_members where batch_id = batches.id and student_id = (select auth.uid())));
+create policy batches_staff_insert on public.batches for insert to authenticated with check ((select app_private.is_staff()));
+create policy batches_staff_update on public.batches for update to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
+create policy batches_staff_delete on public.batches for delete to authenticated using ((select app_private.is_admin()));
+create policy members_read on public.batch_members for select to authenticated using (student_id = (select auth.uid()) or (select app_private.is_staff()));
+create policy members_admin_insert on public.batch_members for insert to authenticated with check ((select app_private.is_admin()));
+create policy members_admin_delete on public.batch_members for delete to authenticated using ((select app_private.is_admin()));
 
-create policy courses_read on public.courses for select to authenticated using ((select public.is_staff()) or exists(select 1 from public.batch_members where student_id = (select auth.uid())));
-create policy courses_staff_all on public.courses for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
-create policy topics_read on public.topics for select to authenticated using ((select public.is_staff()) or exists(select 1 from public.batch_members where student_id = (select auth.uid())));
-create policy topics_staff_all on public.topics for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
+create policy courses_read on public.courses for select to authenticated using ((select app_private.is_staff()) or exists(select 1 from public.batch_members where student_id = (select auth.uid())));
+create policy courses_staff_all on public.courses for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
+create policy topics_read on public.topics for select to authenticated using ((select app_private.is_staff()) or exists(select 1 from public.batch_members where student_id = (select auth.uid())));
+create policy topics_staff_all on public.topics for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
 
-create policy resources_read on public.resources for select to authenticated using ((select public.is_staff()) or (is_published and (select public.can_read_batches(batch_ids))));
-create policy resources_staff_all on public.resources for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()) and created_by = (select auth.uid()));
+create policy resources_read on public.resources for select to authenticated using ((select app_private.is_staff()) or (is_published and (select app_private.can_read_batches(batch_ids))));
+create policy resources_staff_all on public.resources for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()) and created_by = (select auth.uid()));
 create policy resource_progress_own on public.resource_progress for all to authenticated using (student_id = (select auth.uid())) with check (student_id = (select auth.uid()) and exists(select 1 from public.resources where id = resource_id));
 create policy resource_bookmarks_own on public.resource_bookmarks for all to authenticated using (student_id = (select auth.uid())) with check (student_id = (select auth.uid()) and exists(select 1 from public.resources where id = resource_id));
 
-create policy announcements_read on public.announcements for select to authenticated using ((select public.is_staff()) or (is_published and (select public.can_read_batches(batch_ids))));
-create policy announcements_staff_all on public.announcements for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()) and author_id = (select auth.uid()));
+create policy announcements_read on public.announcements for select to authenticated using ((select app_private.is_staff()) or (is_published and (select app_private.can_read_batches(batch_ids))));
+create policy announcements_staff_all on public.announcements for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()) and author_id = (select auth.uid()));
 create policy announcement_reads_own on public.announcement_reads for all to authenticated using (student_id = (select auth.uid())) with check (student_id = (select auth.uid()) and exists(select 1 from public.announcements where id = announcement_id));
-create policy schedule_read on public.schedule_events for select to authenticated using ((select public.can_read_batches(batch_ids)));
-create policy schedule_staff_all on public.schedule_events for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()) and created_by = (select auth.uid()));
+create policy schedule_read on public.schedule_events for select to authenticated using ((select app_private.can_read_batches(batch_ids)));
+create policy schedule_staff_all on public.schedule_events for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()) and created_by = (select auth.uid()));
 
-create policy quizzes_read on public.quizzes for select to authenticated using ((select public.is_staff()) or (is_published and (select public.can_read_batches(batch_ids))));
-create policy quizzes_staff_all on public.quizzes for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()) and created_by = (select auth.uid()));
+create policy quizzes_read on public.quizzes for select to authenticated using ((select app_private.is_staff()) or (is_published and (select app_private.can_read_batches(batch_ids))));
+create policy quizzes_staff_all on public.quizzes for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()) and created_by = (select auth.uid()));
 -- Answer keys live here. Students receive redacted questions via a later RPC.
-create policy questions_staff_all on public.quiz_questions for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
-create policy options_staff_all on public.quiz_options for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
-create policy attempts_read on public.quiz_attempts for select to authenticated using (student_id = (select auth.uid()) or (select public.is_staff()));
-create policy answers_read on public.quiz_answers for select to authenticated using ((select public.is_staff()) or exists(select 1 from public.quiz_attempts where id = attempt_id and student_id = (select auth.uid())));
+create policy questions_staff_all on public.quiz_questions for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
+create policy options_staff_all on public.quiz_options for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
+create policy attempts_read on public.quiz_attempts for select to authenticated using (student_id = (select auth.uid()) or (select app_private.is_staff()));
+create policy answers_read on public.quiz_answers for select to authenticated using ((select app_private.is_staff()));
 
-create policy assignments_read on public.assignments for select to authenticated using ((select public.is_staff()) or (is_published and (select public.can_read_batches(batch_ids))));
-create policy assignments_staff_all on public.assignments for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()) and created_by = (select auth.uid()));
-create policy submissions_read on public.assignment_submissions for select to authenticated using (student_id = (select auth.uid()) or (select public.is_staff()));
+create policy assignments_read on public.assignments for select to authenticated using ((select app_private.is_staff()) or (is_published and (select app_private.can_read_batches(batch_ids))));
+create policy assignments_staff_all on public.assignments for all to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()) and created_by = (select auth.uid()));
+create policy submissions_read on public.assignment_submissions for select to authenticated using (student_id = (select auth.uid()) or (select app_private.is_staff()));
 create policy submissions_student_insert on public.assignment_submissions for insert to authenticated with check (student_id = (select auth.uid()) and status in ('submitted','late') and marks is null and feedback is null and reviewed_by is null and exists(select 1 from public.assignments where id = assignment_id));
-create policy submissions_staff_update on public.assignment_submissions for update to authenticated using ((select public.is_staff())) with check ((select public.is_staff()));
+create policy submissions_staff_update on public.assignment_submissions for update to authenticated using ((select app_private.is_staff())) with check ((select app_private.is_staff()));
 
 create policy notifications_own_read on public.notifications for select to authenticated using (recipient_id = (select auth.uid()));
 create policy notifications_own_update on public.notifications for update to authenticated using (recipient_id = (select auth.uid())) with check (recipient_id = (select auth.uid()));
-create policy notifications_staff_insert on public.notifications for insert to authenticated with check ((select public.is_staff()));
+create policy notifications_staff_insert on public.notifications for insert to authenticated with check ((select app_private.is_staff()));
 
 -- Restrict column-level updates that could otherwise change ownership or grading.
+do $$ declare table_name text; begin
+  foreach table_name in array array['profiles','batches','batch_members','courses','topics','resources','resource_progress','resource_bookmarks','announcements','announcement_reads','schedule_events','quizzes','quiz_questions','quiz_options','quiz_attempts','quiz_answers','assignments','assignment_submissions','notifications'] loop
+    execute format('grant select, insert, update, delete on public.%I to authenticated', table_name);
+  end loop;
+end $$;
+revoke all on all functions in schema app_private from public;
+grant execute on function app_private.is_staff(), app_private.is_admin(), app_private.can_read_batches(uuid[]) to authenticated;
 revoke update on public.profiles from authenticated;
 grant update (full_name, avatar_path, role) on public.profiles to authenticated;
 -- Only admins satisfy the update policy; users cannot promote themselves.
@@ -326,10 +336,11 @@ insert into storage.buckets(id, name, public) values ('resources', 'resources', 
 create policy resource_files_read on storage.objects for select to authenticated
 using (bucket_id = 'resources' and exists(select 1 from public.resources where storage_path = name));
 create policy resource_files_insert on storage.objects for insert to authenticated
-with check (bucket_id = 'resources' and (select public.is_staff()) and exists(select 1 from public.resources where storage_path = name and created_by = (select auth.uid())));
+with check (bucket_id = 'resources' and (select app_private.is_staff()) and exists(select 1 from public.resources where storage_path = name and created_by = (select auth.uid())));
 create policy resource_files_delete on storage.objects for delete to authenticated
-using (bucket_id = 'resources' and (select public.is_staff()) and exists(select 1 from public.resources where storage_path = name and created_by = (select auth.uid())));
+using (bucket_id = 'resources' and (select app_private.is_staff()) and exists(select 1 from public.resources where storage_path = name and created_by = (select auth.uid())));
 create policy submission_files_read on storage.objects for select to authenticated
-using (bucket_id = 'submissions' and (split_part(name, '/', 1) = (select auth.uid())::text or ((select public.is_staff()) and exists(select 1 from public.assignment_submissions where name = any(attachment_paths)))));
+using (bucket_id = 'submissions' and (split_part(name, '/', 1) = (select auth.uid())::text or ((select app_private.is_staff()) and exists(select 1 from public.assignment_submissions where name = any(attachment_paths)))));
 create policy submission_files_insert on storage.objects for insert to authenticated
 with check (bucket_id = 'submissions' and split_part(name, '/', 1) = (select auth.uid())::text);
+
