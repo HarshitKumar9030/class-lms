@@ -53,8 +53,6 @@ class ProfileScreen extends ConsumerWidget {
           orElse: () => const SizedBox.shrink(),
         ),
         const SectionHeader(title: 'Learning'),
-        const AppRow(title: 'Bookmarks', icon: Icons.bookmark_outline),
-        const AppRow(title: 'Downloads', icon: Icons.download_outlined),
         AppRow(
           title: 'Quiz history',
           icon: Icons.history_rounded,
@@ -66,10 +64,6 @@ class ProfileScreen extends ConsumerWidget {
           onTap: () => context.push('/assignments'),
         ),
         const SectionHeader(title: 'Preferences'),
-        const AppRow(
-          title: 'Notifications',
-          icon: Icons.notifications_none_rounded,
-        ),
         AppRow(
           title: 'Appearance',
           subtitle: 'Follows your device setting',

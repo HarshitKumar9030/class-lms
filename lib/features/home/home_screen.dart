@@ -66,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
             children: [
               const SectionHeader(title: 'Next class'),
               data.nextClass == null
-                  ? const EmptyState(
+                  ? const CompactEmptyState(
                       title: 'No class coming up',
                       message: 'Your next class will appear here.',
                       icon: Icons.calendar_today_outlined,
@@ -83,7 +83,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
               const SectionHeader(title: 'Continue learning'),
               data.recentResource == null
-                  ? const EmptyState(
+                  ? const CompactEmptyState(
                       title: 'Ready when you are',
                       message: 'New study resources will appear here.',
                       icon: Icons.menu_book_outlined,
@@ -95,7 +95,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
               const SectionHeader(title: 'Upcoming'),
               if (data.upcomingQuiz == null && data.dueAssignment == null)
-                const EmptyState(
+                const CompactEmptyState(
                   title: 'All clear',
                   message: 'No quizzes or assignments are due soon.',
                   icon: Icons.check_circle_outline,
@@ -132,7 +132,7 @@ class HomeScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(announcementsProvider),
           ),
           data: (items) => items.isEmpty
-              ? const EmptyState(
+              ? const CompactEmptyState(
                   title: 'You’re all caught up',
                   message: 'Nothing new from your teacher.',
                   icon: Icons.campaign_outlined,

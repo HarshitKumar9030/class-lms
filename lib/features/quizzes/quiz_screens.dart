@@ -29,7 +29,7 @@ class QuizListScreen extends ConsumerWidget {
               onRetry: () => ref.invalidate(quizzesProvider),
             ),
             data: (quizzes) => quizzes.isEmpty
-                ? const EmptyState(
+                ? const CompactEmptyState(
                     title: 'No quizzes yet',
                     message: 'Your teacher’s quizzes will appear here.',
                     icon: Icons.quiz_outlined,

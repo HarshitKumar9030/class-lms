@@ -117,7 +117,7 @@ class _ResourceLibraryScreenState extends ConsumerState<ResourceLibraryScreen> {
           data: (all) {
             final resources = all.where(matches).toList();
             if (resources.isEmpty) {
-              return EmptyState(
+              return CompactEmptyState(
                 title: search.isNotEmpty
                     ? 'No matching resources'
                     : 'No resources yet',

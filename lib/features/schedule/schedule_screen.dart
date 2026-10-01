@@ -113,7 +113,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 )
                 .toList();
             if (selectedEvents.isEmpty) {
-              return const EmptyState(
+              return const CompactEmptyState(
                 title: 'No classes today',
                 message: 'Enjoy the time to study at your own pace.',
                 icon: Icons.calendar_today_outlined,
