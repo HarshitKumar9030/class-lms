@@ -19,17 +19,19 @@ abstract final class AppRadius {
 }
 
 abstract final class AppColors {
-  static const accent = Color(0xFF3269A8);
-  static const lightBackground = Color(0xFFF8F8F6);
+  static const accent = Color(0xFFB84325);
+  static const darkAccent = Color(0xFFFFB67E);
+  static const sunshine = Color(0xFFFFC45A);
+  static const lightBackground = Color(0xFFFFF9F0);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightMuted = Color(0xFFF0F1F0);
-  static const lightText = Color(0xFF17191B);
-  static const lightSecondary = Color(0xFF697078);
-  static const darkBackground = Color(0xFF101113);
-  static const darkSurface = Color(0xFF1B1D20);
-  static const darkMuted = Color(0xFF292C30);
-  static const darkText = Color(0xFFF4F5F6);
-  static const darkSecondary = Color(0xFFA5ABB1);
+  static const lightMuted = Color(0xFFFFEDE0);
+  static const lightText = Color(0xFF352825);
+  static const lightSecondary = Color(0xFF75615A);
+  static const darkBackground = Color(0xFF1F1B1B);
+  static const darkSurface = Color(0xFF2C2423);
+  static const darkMuted = Color(0xFF3D302C);
+  static const darkText = Color(0xFFFFF8F1);
+  static const darkSecondary = Color(0xFFD3BEB1);
 }
 
 @immutable

@@ -6,6 +6,50 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_components.dart';
 import 'auth_repository.dart';
 
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 76,
+        height: 76,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(17),
+          child: Image.asset(
+            'assets/logo.png',
+            fit: BoxFit.contain,
+            semanticLabel: 'Tuition Classes book and pen logo',
+          ),
+        ),
+      ),
+      const SizedBox(width: 16),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tuition Classes',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Learn · practise · grow',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
   @override
@@ -82,12 +126,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             padding: const EdgeInsets.all(AppSpacing.page),
             shrinkWrap: true,
             children: [
-              Icon(
-                Icons.menu_book_rounded,
-                size: 32,
-                color: context.palette.accent,
-              ),
-              const SizedBox(height: 32),
+              const _BrandHeader(),
+              const SizedBox(height: 36),
               Text(
                 'Welcome back',
                 style: Theme.of(context).textTheme.displaySmall,
@@ -241,6 +281,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     ),
                   ]
                 : [
+                    const _BrandHeader(),
+                    const SizedBox(height: 32),
                     Text(
                       'Join your class',
                       style: Theme.of(context).textTheme.headlineMedium,

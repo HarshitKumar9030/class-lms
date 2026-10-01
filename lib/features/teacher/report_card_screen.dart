@@ -259,7 +259,7 @@ Future<List<int>> buildReportPdf(ReportCard report) async {
   final document = pw.Document();
   final fontData = await rootBundle.load('assets/fonts/NotoSans.ttf');
   final font = pw.Font.ttf(fontData);
-  final blue = PdfColor.fromHex('#3578C6');
+  final coral = PdfColor.fromHex('#B84325');
   final gray = PdfColor.fromHex('#5A6472');
   pw.Widget section(String title) => pw.Padding(
     padding: const pw.EdgeInsets.only(top: 18, bottom: 7),
@@ -268,7 +268,7 @@ Future<List<int>> buildReportPdf(ReportCard report) async {
       style: pw.TextStyle(
         fontSize: 15,
         fontWeight: pw.FontWeight.bold,
-        color: blue,
+        color: coral,
       ),
     ),
   );
@@ -295,15 +295,15 @@ Future<List<int>> buildReportPdf(ReportCard report) async {
       header: (context) => pw.Container(
         padding: const pw.EdgeInsets.only(bottom: 8),
         decoration: pw.BoxDecoration(
-          border: pw.Border(bottom: pw.BorderSide(color: blue, width: 1)),
+          border: pw.Border(bottom: pw.BorderSide(color: coral, width: 1)),
         ),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'CLASS LMS',
+              'TUITION CLASSES',
               style: pw.TextStyle(
-                color: blue,
+                color: coral,
                 fontSize: 10,
                 fontWeight: pw.FontWeight.bold,
               ),

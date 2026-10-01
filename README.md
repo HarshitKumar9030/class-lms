@@ -1,4 +1,4 @@
-# Class LMS
+# Tuition Classes
 
 A Flutter app for private English tuition. Students see only material assigned to their batches; teachers publish lessons, classes, quizzes and homework.
 

@@ -13,16 +13,25 @@ abstract final class AppTheme {
       muted: dark ? AppColors.darkMuted : AppColors.lightMuted,
       text: dark ? AppColors.darkText : AppColors.lightText,
       secondary: dark ? AppColors.darkSecondary : AppColors.lightSecondary,
-      accent: dark ? const Color(0xFF79AFF0) : AppColors.accent,
+      accent: dark ? AppColors.darkAccent : AppColors.accent,
     );
     final base = ThemeData(brightness: brightness, useMaterial3: true);
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.accent,
+          brightness: brightness,
+          surface: palette.surface,
+        ).copyWith(
+          primary: palette.accent,
+          onPrimary: dark ? AppColors.darkBackground : Colors.white,
+          secondary: dark ? AppColors.sunshine : AppColors.accent,
+          onSecondary: dark ? AppColors.darkBackground : Colors.white,
+          onSurface: palette.text,
+          surfaceContainerHighest: palette.muted,
+        );
     return base.copyWith(
       scaffoldBackgroundColor: palette.background,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.accent,
-        brightness: brightness,
-        surface: palette.surface,
-      ),
+      colorScheme: scheme,
       extensions: [palette],
       textTheme: base.textTheme.copyWith(
         displaySmall: TextStyle(
@@ -86,7 +95,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: palette.accent, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
