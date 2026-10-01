@@ -63,12 +63,6 @@ class ProfileScreen extends ConsumerWidget {
           icon: Icons.task_alt_rounded,
           onTap: () => context.push('/assignments'),
         ),
-        const SectionHeader(title: 'Preferences'),
-        AppRow(
-          title: 'Appearance',
-          subtitle: 'Follows your device setting',
-          icon: Icons.brightness_6_outlined,
-        ),
         const SectionHeader(title: 'Account'),
         AppRow(
           title: 'Sign out',

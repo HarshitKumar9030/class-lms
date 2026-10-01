@@ -13,6 +13,8 @@ import '../../features/quizzes/quiz_screens.dart';
 import '../../features/resources/resource_library_screen.dart';
 import '../../features/resources/resource_viewer_screen.dart';
 import '../../features/schedule/schedule_screen.dart';
+import '../../features/teacher/staff_quiz_editor.dart';
+import '../../features/teacher/staff_screens.dart';
 import '../services/supabase_provider.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/app_components.dart';
@@ -159,10 +161,41 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/teacher',
-        builder: (_, _) => const _PendingPage(
-          title: 'Teacher',
-          message: 'Your teaching overview will appear here.',
-        ),
+        builder: (_, _) => const StaffWorkspaceScreen(),
+        routes: [
+          GoRoute(
+            path: 'sections/:section',
+            builder: (_, state) =>
+                StaffSectionScreen(section: state.pathParameters['section']!),
+          ),
+          GoRoute(
+            path: 'new/:section',
+            builder: (_, state) =>
+                StaffCreateScreen(section: state.pathParameters['section']!),
+          ),
+          GoRoute(
+            path: 'courses/:id',
+            builder: (_, state) =>
+                StaffCourseScreen(courseId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: 'batches/:id',
+            builder: (_, state) =>
+                StaffBatchScreen(batchId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: 'quizzes/:id',
+            builder: (_, state) =>
+                StaffQuizEditorScreen(quizId: state.pathParameters['id']!),
+            routes: [
+              GoRoute(
+                path: 'questions/new',
+                builder: (_, state) =>
+                    StaffQuestionScreen(quizId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );

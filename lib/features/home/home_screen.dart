@@ -49,6 +49,16 @@ class HomeScreen extends ConsumerWidget {
             context,
           ).textTheme.bodyLarge?.copyWith(color: context.palette.secondary),
         ),
+        if (profile.value?.role != null &&
+            profile.value!.role != AppRole.student) ...[
+          const SectionHeader(title: 'Teaching'),
+          AppRow(
+            title: 'Manage class content',
+            subtitle: 'Courses, lessons, classes, quizzes and more',
+            icon: Icons.school_outlined,
+            onTap: () => context.push('/teacher'),
+          ),
+        ],
         overview.when(
           loading: () => const Padding(
             padding: EdgeInsets.only(top: 32),
