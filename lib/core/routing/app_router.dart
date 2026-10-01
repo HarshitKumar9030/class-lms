@@ -14,7 +14,9 @@ import '../../features/resources/resource_library_screen.dart';
 import '../../features/resources/resource_viewer_screen.dart';
 import '../../features/schedule/schedule_screen.dart';
 import '../../features/teacher/staff_quiz_editor.dart';
+import '../../features/teacher/report_card_screen.dart';
 import '../../features/teacher/staff_screens.dart';
+import '../../features/teacher/staff_users_screen.dart';
 import '../services/supabase_provider.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/app_components.dart';
@@ -52,6 +54,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         try {
           final profile = await ref.read(authRepositoryProvider).profile();
           if (profile.role == AppRole.student) return '/home';
+          if (state.matchedLocation.startsWith('/teacher/users') &&
+              profile.role != AppRole.admin) {
+            return '/teacher';
+          }
         } catch (_) {
           return '/home';
         }
@@ -169,9 +175,38 @@ final routerProvider = Provider<GoRouter>((ref) {
                 StaffSectionScreen(section: state.pathParameters['section']!),
           ),
           GoRoute(
+            path: 'users',
+            builder: (_, _) => const StaffUsersScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (_, state) =>
+                    StaffUserDetailScreen(userId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: 'reports',
+            builder: (_, _) => const ReportCardsScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (_, state) =>
+                    ReportCardScreen(studentId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          GoRoute(
             path: 'new/:section',
             builder: (_, state) =>
                 StaffCreateScreen(section: state.pathParameters['section']!),
+          ),
+          GoRoute(
+            path: 'edit/:section/:id',
+            builder: (_, state) => StaffCreateScreen(
+              section: state.pathParameters['section']!,
+              itemId: state.pathParameters['id']!,
+            ),
           ),
           GoRoute(
             path: 'courses/:id',

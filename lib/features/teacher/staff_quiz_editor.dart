@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_components.dart';
 import '../home/home_repository.dart';
+import '../auth/auth_repository.dart';
 import '../quizzes/quiz_repository.dart';
 import 'staff_repository.dart';
 
@@ -16,6 +17,118 @@ class StaffQuizEditorScreen extends ConsumerStatefulWidget {
 
 class _StaffQuizEditorState extends ConsumerState<StaffQuizEditorScreen> {
   bool publishing = false;
+
+  Future<void> manageQuestion(Map<String, dynamic> question) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: Text(question['prompt'] as String)),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit question'),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete question'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null) return;
+    final repo = ref.read(staffRepositoryProvider);
+    final locked = await repo.quizHasAttempts(widget.quizId);
+    if (!mounted) return;
+    if (locked) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Questions are locked after a student starts the quiz.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete question?'),
+          content: const Text('This cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await repo.deleteQuizQuestion(widget.quizId, question['id'] as String);
+        ref.invalidate(staffQuizQuestionsProvider(widget.quizId));
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Couldn’t delete question.')),
+          );
+        }
+      }
+      return;
+    }
+    final controller = TextEditingController(
+      text: question['prompt'] as String,
+    );
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit question'),
+        content: TextField(
+          controller: controller,
+          minLines: 2,
+          maxLines: 5,
+          decoration: const InputDecoration(labelText: 'Question text'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (updated == null || updated.isEmpty) return;
+    try {
+      await repo.updateQuizPrompt(
+        widget.quizId,
+        question['id'] as String,
+        updated,
+      );
+      ref.invalidate(staffQuizQuestionsProvider(widget.quizId));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Couldn’t update question.')),
+        );
+      }
+    }
+  }
 
   Future<void> publish() async {
     final questions = ref.read(staffQuizQuestionsProvider(widget.quizId)).value;
@@ -46,8 +159,22 @@ class _StaffQuizEditorState extends ConsumerState<StaffQuizEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final questions = ref.watch(staffQuizQuestionsProvider(widget.quizId));
+    final items =
+        ref.watch(staffItemsProvider('quizzes')).value ?? const <StaffItem>[];
+    final ownId = ref.read(staffRepositoryProvider).userId;
+    final isAdmin = ref.watch(profileProvider).value?.role == AppRole.admin;
+    final matching = items.where((item) => item.id == widget.quizId);
+    final canManage =
+        matching.isNotEmpty && (isAdmin || matching.first.ownerId == ownId);
     return AppPage(
       title: 'Quiz questions',
+      trailing: IconButton(
+        tooltip: 'Edit quiz',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: canManage
+            ? () => context.push('/teacher/edit/quizzes/${widget.quizId}')
+            : null,
+      ),
       children: [
         Text(
           'Add questions, then publish the quiz for its selected batches.',
@@ -58,8 +185,11 @@ class _StaffQuizEditorState extends ConsumerState<StaffQuizEditorScreen> {
         const SizedBox(height: 20),
         PrimaryButton(
           label: 'Add question',
-          onPressed: () =>
-              context.push('/teacher/quizzes/${widget.quizId}/questions/new'),
+          onPressed: canManage
+              ? () => context.push(
+                  '/teacher/quizzes/${widget.quizId}/questions/new',
+                )
+              : null,
         ),
         const SectionHeader(title: 'Questions'),
         questions.when(
@@ -83,6 +213,9 @@ class _StaffQuizEditorState extends ConsumerState<StaffQuizEditorScreen> {
                         subtitle:
                             '${(items[index]['kind'] as String).replaceAll('_', ' ')} · ${items[index]['marks']} marks',
                         icon: Icons.help_outline_rounded,
+                        onTap: canManage
+                            ? () => manageQuestion(items[index])
+                            : null,
                       ),
                   ],
                 ),
@@ -90,7 +223,9 @@ class _StaffQuizEditorState extends ConsumerState<StaffQuizEditorScreen> {
         const SizedBox(height: 20),
         PrimaryButton(
           label: 'Publish quiz',
-          onPressed: questions.value?.isNotEmpty == true ? publish : null,
+          onPressed: canManage && questions.value?.isNotEmpty == true
+              ? publish
+              : null,
           busy: publishing,
         ),
       ],

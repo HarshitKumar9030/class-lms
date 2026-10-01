@@ -64,6 +64,20 @@ class StaffWorkspaceScreen extends ConsumerWidget {
           icon: entry.value.$3,
           onTap: () => context.push('/teacher/sections/${entry.key}'),
         ),
+      const SectionHeader(title: 'People & progress'),
+      if (ref.watch(profileProvider).value?.role == AppRole.admin)
+        AppRow(
+          title: 'User management',
+          subtitle: 'Roles and batch enrollment',
+          icon: Icons.manage_accounts_outlined,
+          onTap: () => context.push('/teacher/users'),
+        ),
+      AppRow(
+        title: 'Report cards',
+        subtitle: 'Learning performance and activity',
+        icon: Icons.assessment_outlined,
+        onTap: () => context.push('/teacher/reports'),
+      ),
       const SizedBox(height: 20),
     ],
   );
@@ -79,6 +93,8 @@ class StaffSectionScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: Text('Section unavailable')));
     }
     final value = ref.watch(staffItemsProvider(section));
+    final isAdmin = ref.watch(profileProvider).value?.role == AppRole.admin;
+    final ownId = ref.read(staffRepositoryProvider).userId;
     return AppPage(
       title: details.$1,
       trailing: IconButton(
@@ -119,25 +135,37 @@ class StaffSectionScreen extends ConsumerWidget {
                     for (final item in items)
                       AppRow(
                         title: item.title,
-                        subtitle: switch (section) {
-                          'courses' => 'Course',
-                          'batches' => 'Batch',
-                          'schedule_events' => 'Scheduled',
-                          _ => item.published ? 'Published' : 'Draft',
-                        },
+                        subtitle:
+                            item.ownerId != null &&
+                                !isAdmin &&
+                                item.ownerId != ownId
+                            ? 'Created by another teacher'
+                            : switch (section) {
+                                'courses' => 'Course',
+                                'batches' => 'Batch',
+                                'schedule_events' => 'Scheduled',
+                                _ => item.published ? 'Published' : 'Draft',
+                              },
                         icon: details.$3,
-                        onTap: switch (section) {
-                          'courses' => () => context.push(
-                            '/teacher/courses/${item.id}',
-                          ),
-                          'batches' => () => context.push(
-                            '/teacher/batches/${item.id}',
-                          ),
-                          'quizzes' => () => context.push(
-                            '/teacher/quizzes/${item.id}',
-                          ),
-                          _ => null,
-                        },
+                        onTap:
+                            item.ownerId != null &&
+                                !isAdmin &&
+                                item.ownerId != ownId
+                            ? null
+                            : switch (section) {
+                                'courses' => () => context.push(
+                                  '/teacher/courses/${item.id}',
+                                ),
+                                'batches' => () => context.push(
+                                  '/teacher/batches/${item.id}',
+                                ),
+                                'quizzes' => () => context.push(
+                                  '/teacher/quizzes/${item.id}',
+                                ),
+                                _ => () => context.push(
+                                  '/teacher/edit/$section/${item.id}',
+                                ),
+                              },
                       ),
                   ],
                 ),
@@ -188,13 +216,111 @@ class StaffCourseScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> manageTopic(
+    BuildContext context,
+    WidgetRef ref,
+    StaffChoice topic,
+  ) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: Text(topic.title), subtitle: const Text('Topic')),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () => Navigator.pop(context, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    if (action == 'rename') {
+      final controller = TextEditingController(text: topic.title);
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Rename topic'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Topic name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (name == null || name.isEmpty) return;
+      try {
+        await ref.read(staffRepositoryProvider).updateTopic(topic.id, name);
+        ref.invalidate(staffTopicsProvider(courseId));
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Couldn’t rename topic.')),
+          );
+        }
+      }
+    } else if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete topic?'),
+          content: const Text(
+            'Resources assigned to this topic must be moved or deleted first.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await ref.read(staffRepositoryProvider).deleteTopic(topic.id);
+        ref.invalidate(staffTopicsProvider(courseId));
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Couldn’t delete topic. Move its resources first.'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) => AppPage(
     title: 'Topics',
     trailing: IconButton(
-      tooltip: 'Add topic',
-      icon: const Icon(Icons.add_rounded),
-      onPressed: () => addTopic(context, ref),
+      tooltip: 'Edit course',
+      icon: const Icon(Icons.edit_outlined),
+      onPressed: () => context.push('/teacher/edit/courses/$courseId'),
     ),
     children: [
       PrimaryButton(
@@ -219,7 +345,11 @@ class StaffCourseScreen extends ConsumerWidget {
                 : Column(
                     children: [
                       for (final topic in topics)
-                        AppRow(title: topic.title, icon: Icons.topic_outlined),
+                        AppRow(
+                          title: topic.title,
+                          icon: Icons.topic_outlined,
+                          onTap: () => manageTopic(context, ref, topic),
+                        ),
                     ],
                   ),
           ),
@@ -299,6 +429,11 @@ class StaffBatchScreen extends ConsumerWidget {
     final members = ref.watch(staffBatchStudentIdsProvider(batchId));
     return AppPage(
       title: 'Batch students',
+      trailing: IconButton(
+        tooltip: 'Edit batch',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => context.push('/teacher/edit/batches/$batchId'),
+      ),
       children: [
         Text(
           isAdmin
@@ -356,8 +491,9 @@ class StaffBatchScreen extends ConsumerWidget {
 }
 
 class StaffCreateScreen extends ConsumerStatefulWidget {
-  const StaffCreateScreen({super.key, required this.section});
+  const StaffCreateScreen({super.key, required this.section, this.itemId});
   final String section;
+  final String? itemId;
   @override
   ConsumerState<StaffCreateScreen> createState() => _StaffCreateScreenState();
 }
@@ -370,11 +506,15 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
   final url = TextEditingController();
   final number = TextEditingController();
   final batchIds = <String>{};
+  final recipientIds = <String>{};
+  String audience = 'all';
   String? courseId;
   String? topicId;
   String resourceKind = 'pdf';
   String scheduleKind = 'class';
+  String scheduleStatus = 'scheduled';
   bool pinned = false;
+  bool published = true;
   bool fileMode = true;
   int priority = 0;
   PlatformFile? file;
@@ -382,7 +522,92 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
   DateTime endsAt = DateTime.now().add(const Duration(days: 1, hours: 1));
   DateTime dueAt = DateTime.now().add(const Duration(days: 7));
   bool busy = false;
+  bool loadingItem = false;
+  bool loadFailed = false;
   String? error;
+
+  bool get editing => widget.itemId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (editing) loadItem();
+  }
+
+  Future<void> loadItem() async {
+    setState(() => loadingItem = true);
+    try {
+      final row = await ref
+          .read(staffRepositoryProvider)
+          .item(widget.section, widget.itemId!);
+      final owner =
+          row[widget.section == 'announcements' ? 'author_id' : 'created_by']
+              as String?;
+      if (owner != null) {
+        final profile = await ref.read(authRepositoryProvider).profile();
+        if (profile.role != AppRole.admin && owner != profile.id) {
+          throw StateError('Only the author or an admin can edit this item.');
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        title.text =
+            (row[widget.section == 'batches' ? 'name' : 'title'] as String?) ??
+            '';
+        description.text = row['description'] as String? ?? '';
+        detail.text =
+            (row[widget.section == 'announcements'
+                    ? 'content'
+                    : widget.section == 'assignments'
+                    ? 'instructions'
+                    : 'subtitle']
+                as String?) ??
+            '';
+        location.text = row['location'] as String? ?? '';
+        url.text = row['external_url'] as String? ?? '';
+        courseId = row['course_id'] as String?;
+        topicId = row['topic_id'] as String?;
+        resourceKind = row['kind'] as String? ?? 'pdf';
+        fileMode = row['storage_path'] != null;
+        scheduleKind = widget.section == 'schedule_events'
+            ? row['kind'] as String
+            : 'class';
+        scheduleStatus = row['status'] as String? ?? 'scheduled';
+        pinned = row['is_pinned'] as bool? ?? false;
+        priority = row['priority'] as int? ?? 0;
+        published = row['is_published'] as bool? ?? true;
+        batchIds.addAll(
+          List<String>.from(row['batch_ids'] as List? ?? const []),
+        );
+        recipientIds.addAll(
+          List<String>.from(row['recipient_ids'] as List? ?? const []),
+        );
+        audience = recipientIds.isNotEmpty
+            ? 'users'
+            : batchIds.isNotEmpty
+            ? 'batches'
+            : 'all';
+        if (row['starts_at'] != null) {
+          startsAt = DateTime.parse(row['starts_at'] as String).toLocal();
+        }
+        if (row['ends_at'] != null) {
+          endsAt = DateTime.parse(row['ends_at'] as String).toLocal();
+        }
+        if (row['due_at'] != null) {
+          dueAt = DateTime.parse(row['due_at'] as String).toLocal();
+        }
+        final n =
+            row[widget.section == 'quizzes'
+                ? 'duration_minutes'
+                : 'maximum_marks'];
+        number.text = n?.toString() ?? '';
+      });
+    } catch (_) {
+      if (mounted) setState(() => loadFailed = true);
+    } finally {
+      if (mounted) setState(() => loadingItem = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -440,7 +665,9 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
     switch (widget.section) {
       case 'resources':
         if (courseId == null) return 'Create and select a course first.';
-        if (fileMode && file == null) return 'Choose a file to upload.';
+        if (fileMode && file == null && !editing) {
+          return 'Choose a file to upload.';
+        }
         final link = Uri.tryParse(url.text.trim());
         if (!fileMode &&
             (link == null || link.scheme != 'https' || link.host.isEmpty)) {
@@ -448,6 +675,12 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
         }
       case 'announcements':
         if (detail.text.trim().isEmpty) return 'Enter the content.';
+        if (audience == 'users' && recipientIds.isEmpty) {
+          return 'Choose at least one student.';
+        }
+        if (audience == 'batches' && batchIds.isEmpty) {
+          return 'Choose at least one batch.';
+        }
       case 'schedule_events':
         if (!endsAt.isAfter(startsAt)) {
           return 'End time must be after start time.';
@@ -479,6 +712,71 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
     });
     try {
       final repo = ref.read(staffRepositoryProvider);
+      if (editing) {
+        final values = switch (widget.section) {
+          'courses' => <String, dynamic>{'title': title.text.trim()},
+          'batches' => <String, dynamic>{
+            'name': title.text.trim(),
+            'description': description.text.trim(),
+          },
+          'announcements' => <String, dynamic>{
+            'title': title.text.trim(),
+            'content': detail.text.trim(),
+            'is_pinned': pinned,
+            'priority': priority,
+            'is_published': published,
+            'batch_ids': audience == 'batches' ? batchIds.toList() : <String>[],
+            'recipient_ids': audience == 'users'
+                ? recipientIds.toList()
+                : <String>[],
+          },
+          'schedule_events' => <String, dynamic>{
+            'title': title.text.trim(),
+            'subtitle': detail.text.trim(),
+            'starts_at': startsAt.toUtc().toIso8601String(),
+            'ends_at': endsAt.toUtc().toIso8601String(),
+            'kind': scheduleKind,
+            'status': scheduleStatus,
+            'location': location.text.trim(),
+            'batch_ids': batchIds.toList(),
+          },
+          'assignments' => <String, dynamic>{
+            'title': title.text.trim(),
+            'instructions': detail.text.trim(),
+            'due_at': dueAt.toUtc().toIso8601String(),
+            'maximum_marks': num.tryParse(number.text.trim()),
+            'batch_ids': batchIds.toList(),
+            'is_published': published,
+          },
+          'resources' => <String, dynamic>{
+            'title': title.text.trim(),
+            'description': description.text.trim(),
+            'course_id': courseId,
+            'topic_id': topicId,
+            'kind': resourceKind,
+            'batch_ids': batchIds.toList(),
+            'is_published': published,
+            if (!fileMode) 'external_url': url.text.trim(),
+          },
+          'quizzes' => <String, dynamic>{
+            'title': title.text.trim(),
+            'description': description.text.trim(),
+            'duration_minutes': int.tryParse(number.text.trim()),
+            'batch_ids': batchIds.toList(),
+            'is_published': published,
+          },
+          _ => <String, dynamic>{},
+        };
+        await repo.updateItem(widget.section, widget.itemId!, values);
+        ref.invalidate(staffItemsProvider(widget.section));
+        ref.invalidate(resourcesProvider);
+        ref.invalidate(announcementsProvider);
+        ref.invalidate(assignmentsProvider);
+        ref.invalidate(scheduleWeekProvider);
+        ref.invalidate(homeOverviewProvider);
+        if (mounted) context.pop();
+        return;
+      }
       switch (widget.section) {
         case 'courses':
           await repo.createCourse(title.text);
@@ -488,7 +786,10 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
           await repo.createAnnouncement(
             title: title.text,
             content: detail.text,
-            batchIds: batchIds.toList(),
+            batchIds: audience == 'batches' ? batchIds.toList() : const [],
+            recipientIds: audience == 'users'
+                ? recipientIds.toList()
+                : const [],
             pinned: pinned,
             priority: priority,
           );
@@ -569,6 +870,58 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
     }
   }
 
+  Future<void> delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this item?'),
+        content: const Text(
+          'This cannot be undone. Courses with resources, and quizzes with attempts, may need related content removed first.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ref
+          .read(staffRepositoryProvider)
+          .deleteItem(widget.section, widget.itemId!);
+      ref.invalidate(staffItemsProvider(widget.section));
+      ref.invalidate(staffCoursesProvider);
+      ref.invalidate(staffBatchesProvider);
+      ref.invalidate(resourcesProvider);
+      ref.invalidate(announcementsProvider);
+      ref.invalidate(assignmentsProvider);
+      ref.invalidate(scheduleWeekProvider);
+      ref.invalidate(homeOverviewProvider);
+      if (mounted) {
+        context.go('/teacher/sections/${widget.section}');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error =
+              'Couldn’t delete this item. Remove related content first, then try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Widget field(
     TextEditingController controller,
     String label, {
@@ -624,6 +977,82 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
         ),
       );
 
+  Widget announcementAudience() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SectionHeader(title: 'Audience'),
+      SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(value: 'all', label: Text('All')),
+          ButtonSegment(value: 'batches', label: Text('Batches')),
+          ButtonSegment(value: 'users', label: Text('Students')),
+        ],
+        selected: {audience},
+        onSelectionChanged: (value) => setState(() => audience = value.first),
+      ),
+      const SizedBox(height: 10),
+      if (audience == 'all')
+        Text(
+          'All enrolled students',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      if (audience == 'batches')
+        ref
+            .watch(staffBatchesProvider)
+            .when(
+              loading: () => const LoadingRows(count: 1),
+              error: (_, _) => ErrorState(
+                message: 'Couldn’t load batches.',
+                onRetry: () => ref.invalidate(staffBatchesProvider),
+              ),
+              data: (batches) => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final batch in batches)
+                    FilterChip(
+                      label: Text(batch.title),
+                      selected: batchIds.contains(batch.id),
+                      onSelected: (selected) => setState(
+                        () => selected
+                            ? batchIds.add(batch.id)
+                            : batchIds.remove(batch.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+      if (audience == 'users')
+        ref
+            .watch(staffStudentsProvider)
+            .when(
+              loading: () => const LoadingRows(count: 1),
+              error: (_, _) => ErrorState(
+                message: 'Couldn’t load students.',
+                onRetry: () => ref.invalidate(staffStudentsProvider),
+              ),
+              data: (students) => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final student in students)
+                    FilterChip(
+                      label: Text(
+                        student.title.isEmpty ? student.id : student.title,
+                      ),
+                      selected: recipientIds.contains(student.id),
+                      onSelected: (selected) => setState(
+                        () => selected
+                            ? recipientIds.add(student.id)
+                            : recipientIds.remove(student.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+    ],
+  );
+
   Widget dateRow(String label, DateTime value, ValueChanged<DateTime> update) =>
       AppRow(
         title: label,
@@ -642,6 +1071,21 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
     if (details == null) {
       return const Scaffold(body: Center(child: Text('Section unavailable')));
     }
+    if (loadingItem) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Loading item')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (loadFailed) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: ErrorState(
+          message: 'Couldn’t load this item.',
+          onRetry: loadItem,
+        ),
+      );
+    }
     final courseData = ref.watch(staffCoursesProvider);
     final topics = courseId == null
         ? null
@@ -649,10 +1093,21 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          section == 'courses'
+          editing
+              ? 'Edit ${details.$1.toLowerCase()}'
+              : section == 'courses'
               ? 'Add course'
               : 'Add ${details.$1.toLowerCase()}',
         ),
+        actions: editing
+            ? [
+                IconButton(
+                  tooltip: 'Delete item',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: busy ? null : delete,
+                ),
+              ]
+            : null,
       ),
       body: SafeArea(
         child: Center(
@@ -747,10 +1202,12 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
                       ButtonSegment(value: false, label: Text('Link')),
                     ],
                     selected: {fileMode},
-                    onSelectionChanged: (value) => setState(() {
-                      fileMode = value.first;
-                      resourceKind = fileMode ? 'pdf' : 'web_link';
-                    }),
+                    onSelectionChanged: editing
+                        ? null
+                        : (value) => setState(() {
+                            fileMode = value.first;
+                            resourceKind = fileMode ? 'pdf' : 'web_link';
+                          }),
                   ),
                   const SizedBox(height: 14),
                   if (fileMode) ...[
@@ -779,9 +1236,11 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
                     ),
                     const SizedBox(height: 12),
                     AppRow(
-                      title: file?.name ?? 'Choose file',
+                      title: editing
+                          ? 'Current file retained'
+                          : file?.name ?? 'Choose file',
                       icon: Icons.upload_file_rounded,
-                      onTap: pickFile,
+                      onTap: editing ? null : pickFile,
                     ),
                   ] else ...[
                     DropdownButtonFormField<String>(
@@ -824,6 +1283,29 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
                     onChanged: (value) =>
                         setState(() => scheduleKind = value ?? 'class'),
                   ),
+                  if (editing) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: scheduleStatus,
+                      decoration: const InputDecoration(labelText: 'Status'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'scheduled',
+                          child: Text('Scheduled'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'rescheduled',
+                          child: Text('Rescheduled'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cancelled',
+                          child: Text('Cancelled'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => scheduleStatus = value ?? 'scheduled'),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   field(location, 'Location or meeting link'),
                   const SectionHeader(title: 'When'),
@@ -845,8 +1327,25 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
                     'Duration in minutes (optional)',
                     keyboardType: TextInputType.number,
                   ),
-                if (!const ['courses', 'batches'].contains(section))
+                if (section == 'announcements') announcementAudience(),
+                if (!const [
+                  'courses',
+                  'batches',
+                  'announcements',
+                ].contains(section))
                   batchSelector(),
+                if (editing &&
+                    const [
+                      'announcements',
+                      'assignments',
+                      'resources',
+                      'quizzes',
+                    ].contains(section))
+                  SwitchListTile(
+                    title: const Text('Published'),
+                    value: published,
+                    onChanged: (value) => setState(() => published = value),
+                  ),
                 if (error != null) ...[
                   const SizedBox(height: 16),
                   Text(
@@ -858,14 +1357,24 @@ class _StaffCreateScreenState extends ConsumerState<StaffCreateScreen> {
                 ],
                 const SizedBox(height: 28),
                 PrimaryButton(
-                  label: section == 'quizzes'
+                  label: editing
+                      ? 'Save changes'
+                      : section == 'quizzes'
                       ? 'Create draft and add questions'
                       : const ['courses', 'batches'].contains(section)
                       ? 'Create'
                       : 'Publish',
-                  onPressed: save,
+                  onPressed: loadingItem ? null : save,
                   busy: busy,
                 ),
+                if (editing) ...[
+                  const SizedBox(height: 14),
+                  TextButton.icon(
+                    onPressed: busy ? null : delete,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete item'),
+                  ),
+                ],
                 const SizedBox(height: 30),
               ],
             ),

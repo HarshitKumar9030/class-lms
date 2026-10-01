@@ -20,11 +20,32 @@ class StaffItem {
     required this.title,
     required this.published,
     this.subtitle,
+    this.ownerId,
   });
   final String id;
   final String title;
   final bool published;
   final String? subtitle;
+  final String? ownerId;
+}
+
+class ManagedUser {
+  const ManagedUser({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.role,
+  });
+  final String id;
+  final String name;
+  final String email;
+  final String role;
+  factory ManagedUser.fromJson(Map<String, dynamic> row) => ManagedUser(
+    id: row['id'] as String,
+    name: row['full_name'] as String? ?? '',
+    email: row['email'] as String? ?? '',
+    role: row['role'] as String,
+  );
 }
 
 class StaffRepository {
@@ -74,6 +95,16 @@ class StaffRepository {
 
   Future<List<StaffItem>> items(String section) async {
     final titleColumn = section == 'batches' ? 'name' : 'title';
+    final ownerColumn = section == 'announcements'
+        ? 'author_id'
+        : const [
+            'resources',
+            'schedule_events',
+            'quizzes',
+            'assignments',
+          ].contains(section)
+        ? 'created_by'
+        : null;
     final hasPublication = const [
       'resources',
       'announcements',
@@ -82,7 +113,9 @@ class StaffRepository {
     ].contains(section);
     final rows = await client
         .from(section)
-        .select('id,$titleColumn${hasPublication ? ',is_published' : ''}')
+        .select(
+          'id,$titleColumn${hasPublication ? ',is_published' : ''}${ownerColumn == null ? '' : ',$ownerColumn'}',
+        )
         .limit(100);
     return rows
         .map(
@@ -90,9 +123,51 @@ class StaffRepository {
             id: row['id'] as String,
             title: row[titleColumn] as String,
             published: hasPublication ? row['is_published'] as bool : true,
+            ownerId: ownerColumn == null ? null : row[ownerColumn] as String?,
           ),
         )
         .toList();
+  }
+
+  Future<Map<String, dynamic>> item(String section, String id) async =>
+      await client.from(section).select().eq('id', id).single();
+
+  Future<void> updateItem(
+    String section,
+    String id,
+    Map<String, dynamic> values,
+  ) async {
+    await client.from(section).update(values).eq('id', id);
+  }
+
+  Future<void> deleteItem(String section, String id) async {
+    if (section == 'resources') {
+      final row = await item(section, id);
+      final path = row['storage_path'] as String?;
+      if (path != null) await client.storage.from('resources').remove([path]);
+    }
+    await client.from(section).delete().eq('id', id);
+  }
+
+  Future<List<ManagedUser>> users() async {
+    final rows = await client
+        .from('profiles')
+        .select('id,full_name,email,role')
+        .order('full_name')
+        .limit(500);
+    return rows.map(ManagedUser.fromJson).toList();
+  }
+
+  Future<void> setUserRole(String id, String role) async {
+    await client.from('profiles').update({'role': role}).eq('id', id);
+  }
+
+  Future<List<String>> userBatchIds(String id) async {
+    final rows = await client
+        .from('batch_members')
+        .select('batch_id')
+        .eq('student_id', id);
+    return rows.map((row) => row['batch_id'] as String).toList();
   }
 
   Future<void> createCourse(String title) async =>
@@ -101,6 +176,12 @@ class StaffRepository {
   Future<void> createTopic(String courseId, String title) async => client
       .from('topics')
       .insert({'course_id': courseId, 'title': title.trim()});
+
+  Future<void> updateTopic(String topicId, String title) async =>
+      client.from('topics').update({'title': title.trim()}).eq('id', topicId);
+
+  Future<void> deleteTopic(String topicId) async =>
+      client.from('topics').delete().eq('id', topicId);
 
   Future<void> createBatch(String name, String description) async =>
       client.from('batches').insert({
@@ -132,6 +213,7 @@ class StaffRepository {
     required String title,
     required String content,
     required List<String> batchIds,
+    required List<String> recipientIds,
     required bool pinned,
     required int priority,
   }) async {
@@ -139,6 +221,7 @@ class StaffRepository {
       'title': title.trim(),
       'content': content.trim(),
       'batch_ids': batchIds,
+      'recipient_ids': recipientIds,
       'priority': priority,
       'is_pinned': pinned,
       'is_published': true,
@@ -273,9 +356,39 @@ class StaffRepository {
   Future<List<Map<String, dynamic>>> quizQuestions(String quizId) async =>
       await client
           .from('quiz_questions')
-          .select('id,prompt,kind,marks,quiz_options(id,label,is_correct)')
+          .select('id,prompt,kind,marks')
           .eq('quiz_id', quizId)
           .order('sort_order');
+
+  Future<bool> quizHasAttempts(String quizId) async {
+    final rows = await client
+        .from('quiz_attempts')
+        .select('id')
+        .eq('quiz_id', quizId)
+        .limit(1);
+    return rows.isNotEmpty;
+  }
+
+  Future<void> updateQuizPrompt(
+    String quizId,
+    String questionId,
+    String prompt,
+  ) async {
+    if (await quizHasAttempts(quizId)) {
+      throw StateError('Questions cannot change after attempts begin.');
+    }
+    await client
+        .from('quiz_questions')
+        .update({'prompt': prompt.trim()})
+        .eq('id', questionId);
+  }
+
+  Future<void> deleteQuizQuestion(String quizId, String questionId) async {
+    if (await quizHasAttempts(quizId)) {
+      throw StateError('Questions cannot change after attempts begin.');
+    }
+    await client.from('quiz_questions').delete().eq('id', questionId);
+  }
 
   Future<void> addQuizQuestion({
     required String quizId,
@@ -330,6 +443,12 @@ final staffBatchesProvider = FutureProvider<List<StaffChoice>>(
 );
 final staffStudentsProvider = FutureProvider<List<StaffChoice>>(
   (ref) => ref.watch(staffRepositoryProvider).students(),
+);
+final managedUsersProvider = FutureProvider<List<ManagedUser>>(
+  (ref) => ref.watch(staffRepositoryProvider).users(),
+);
+final managedUserBatchesProvider = FutureProvider.family<List<String>, String>(
+  (ref, userId) => ref.watch(staffRepositoryProvider).userBatchIds(userId),
 );
 final staffItemsProvider = FutureProvider.family<List<StaffItem>, String>(
   (ref, section) => ref.watch(staffRepositoryProvider).items(section),
